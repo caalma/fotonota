@@ -1,4 +1,4 @@
-const CACHE_NAME = 'foto-filtro-v1';
+const CACHE_NAME = 'foto-nota-v1';
 const urlsToCache = [
     '/',
     '/index.html',
