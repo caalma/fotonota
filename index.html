@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>FotoFiltro Móvil</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <link rel="manifest" href="/manifest.json">
+        <meta name="theme-color" content="#000000">
+        <link rel="apple-touch-icon" href="/icon-192.png">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="mobile-web-app-capable" content="yes">
+        <style>
+         body {
+             margin: 0;
+             position: relative;
+             height: 100vh;
+             background: #000;
+             overflow: hidden;
+         }
+
+         #video {
+             position: absolute;
+             top: 0;
+             left: 0;
+             width: 100%;
+             height: 100%;
+             object-fit: cover;
+         }
+
+         .controls {
+             position: fixed;
+             bottom: 20px;
+             left: 0;
+             right: 0;
+             display: flex;
+             justify-content: center;
+             gap: 15px;
+             padding: 0 20px;
+         }
+
+         button, select {
+             padding: 12px 24px;
+             font-size: 18px;
+             border: none;
+             border-radius: 50px;
+             background: rgba(255,255,255,0.9);
+             cursor: pointer;
+             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+         }
+
+         select {
+             background: rgba(255,255,255,0.8);
+             padding: 10px 20px;
+         }
+
+         .hidden { display: none; }
+        </style>
+
+    </head>
+    <body>
+        <video id="video" autoplay></video>
+        <div class="controls">
+            <button id="startCamera">Iniciar Cámara</button>
+            <select id="cameras" class="hidden"></select>
+            <button id="capture" class="hidden">📸 Tomar Foto</button>
+        </div>
+
+        <script>
+         let currentStream;
+         const video = document.getElementById('video');
+         const camerasSelect = document.getElementById('cameras');
+         const startCameraBtn = document.getElementById('startCamera');
+         const captureBtn = document.getElementById('capture');
+
+         async function loadCameras() {
+             try {
+                 const devices = await navigator.mediaDevices.enumerateDevices();
+                 const videoDevices = devices.filter(d => d.kind === 'videoinput');
+
+                 if(videoDevices.length === 0) {
+                     alert('No se encontraron cámaras disponibles');
+                     return;
+                 }
+
+                 camerasSelect.innerHTML = videoDevices.map(device =>
+                     `<option value="${device.deviceId}">${device.label || `Cámara ${videoDevices.indexOf(device)+1}`}</option>`
+                 ).join('');
+
+                 camerasSelect.classList.remove('hidden');
+                 captureBtn.classList.remove('hidden');
+                 startCameraBtn.classList.add('hidden');
+
+             } catch (error) {
+                 console.error('Error al acceder a cámaras:', error);
+                 alert('No se pudo acceder a las cámaras. Asegúrate de dar permisos.');
+             }
+         }
+
+         async function startCamera(deviceId) {
+             try {
+                 if (currentStream) {
+                     currentStream.getTracks().forEach(track => track.stop());
+                 }
+
+                 const constraints = {
+                     video: {
+                         deviceId: deviceId ? { exact: deviceId } : undefined,
+                         facingMode: 'environment' // Prioriza cámara trasera en móviles
+                     }
+                 };
+
+                 currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                 video.srcObject = currentStream;
+
+             } catch (error) {
+                 console.error('Error al iniciar cámara:', error);
+                 alert('No se pudo iniciar la cámara');
+             }
+         }
+
+         startCameraBtn.addEventListener('click', async () => {
+             await loadCameras();
+             await startCamera(camerasSelect.value);
+         });
+
+         camerasSelect.addEventListener('change', async (e) => {
+             await startCamera(e.target.value);
+         });
+
+         captureBtn.addEventListener('click', async () => {
+             const canvas = document.createElement('canvas');
+             canvas.width = video.videoWidth;
+             canvas.height = video.videoHeight;
+             const ctx = canvas.getContext('2d');
+
+             // Aplicar filtros
+             ctx.filter = 'invert(1) contrast(150%)';
+             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+             // Convertir a blob para mejor compatibilidad móvil
+             canvas.toBlob(blob => {
+                 const url = URL.createObjectURL(blob);
+                 const link = document.createElement('a');
+                 link.href = url;
+                 link.download = `foto_${new Date().toISOString().replace(/[:.]/g,"-")}.png`;
+                 link.click();
+                 URL.revokeObjectURL(url);
+             }, 'image/png');
+         });
+        </script>
+    </body>
+</html>
